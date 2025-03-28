@@ -327,6 +327,147 @@ class TVSeriesBot:
             else:
                 return {"error": f"Could not find valid ID for series '{series_name}'"}
 
+        # Add this to the _handle_intent method in TVSeriesBot class
+
+        elif intent == "get_series_awards":
+            series_name = params.get("series_name", "")
+
+            # Ensure we have a series name
+            if not series_name:
+                return {"error": "Please specify a TV series name to see its awards"}
+
+            print(f"Looking for awards for series: {series_name}")
+
+            # Search for the series
+            results = self.tvdb_client.search_series(series_name, limit=1)
+
+            if not results:
+                return {"error": f"Could not find series '{series_name}'"}
+
+            # Get full information about the found series
+            found_series = results[0]
+            series_id_str = found_series.get("id")
+            series_id = None
+
+            # Extract numeric ID from different possible formats
+            if isinstance(series_id_str, int):
+                series_id = series_id_str
+            elif isinstance(series_id_str, str):
+                if series_id_str.startswith("series-"):
+                    try:
+                        series_id = int(series_id_str.replace("series-", ""))
+                    except ValueError:
+                        return {"error": f"Invalid series ID format: {series_id_str}"}
+                else:
+                    try:
+                        series_id = int(series_id_str)
+                    except ValueError:
+                        return {"error": f"Invalid series ID format: {series_id_str}"}
+            else:
+                return {"error": f"Could not find valid ID for series '{series_name}'"}
+
+            # Get awards for the series
+            print(f"Getting awards for series ID {series_id}")
+            awards = self.tvdb_client.get_series_awards(series_id)
+
+            # Add series name to the response for context
+            return {
+                "series_name": found_series.get("name", series_name),
+                "awards": awards
+            }
+
+        elif intent == "get_movie_awards":
+            movie_name = params.get("movie_name", "")
+
+            # Ensure we have a movie name
+            if not movie_name:
+                return {"error": "Please specify a movie name to see its awards"}
+
+            # Search for the movie
+            results = self.tvdb_client.search_movies(query=movie_name, limit=1)
+
+            if not results:
+                return {"error": f"Could not find movie '{movie_name}'"}
+
+            # Get the movie ID
+            movie_id_str = results[0].get("id")
+            movie_id = None
+
+            # Extract numeric ID
+            if isinstance(movie_id_str, int):
+                movie_id = movie_id_str
+            elif isinstance(movie_id_str, str):
+                if movie_id_str.startswith("movie-"):
+                    try:
+                        movie_id = int(movie_id_str.replace("movie-", ""))
+                    except ValueError:
+                        return {"error": f"Invalid movie ID format: {movie_id_str}"}
+                else:
+                    try:
+                        movie_id = int(movie_id_str)
+                    except ValueError:
+                        return {"error": f"Invalid movie ID format: {movie_id_str}"}
+            else:
+                return {"error": f"Could not find valid ID for movie '{movie_name}'"}
+
+            # Get awards for the movie
+            awards = self.tvdb_client.get_movie_awards(movie_id)
+
+            # Add movie name to the response for context
+            return {
+                "movie_name": results[0].get("name", movie_name),
+                "awards": awards
+            }
+
+        elif intent == "advanced_search":
+            # Extract search parameters
+            query = params.get("query", "")
+            type = params.get("type")
+            year = params.get("year")
+            country = params.get("country")
+            company = params.get("company")
+            director = params.get("director")
+            language = params.get("language")
+            network = params.get("network")
+            primary_type = params.get("primary_type")
+            remote_id = params.get("remote_id")
+
+            # Convert year to int if it's a string
+            if year and isinstance(year, str) and year.isdigit():
+                year = int(year)
+
+            # Perform the advanced search
+            results = self.tvdb_client.advanced_search(
+                query=query,
+                type=type,
+                year=year,
+                country=country,
+                company=company,
+                language=language,
+                director=director,
+                primary_type=primary_type,
+                network=network,
+                remote_id=remote_id,
+                limit=limit
+            )
+
+            # Return the search results
+            return {
+                "search_params": {
+                    "query": query,
+                    "type": type,
+                    "year": year,
+                    "country": country,
+                    "company": company,
+                    "language": language,
+                    "director": director,
+                    "network": network
+                },
+                "results": results
+            }
+
+
+
         elif intent == "get_character_details":
             character_name = params.get("character_name", "")
             series_name = params.get("series_name", "")

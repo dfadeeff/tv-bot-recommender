@@ -63,6 +63,23 @@ class LLMService:
         - get_artwork: User wants to see images or artwork for a series
         - update_preferences: User is sharing their preferences
         - help: User needs help using the system
+        - search_series: User wants to find TV series based on criteria
+        - get_series_details: User wants detailed information about a specific series
+        - get_similar_series: User wants recommendations similar to a specific series
+        - get_actor_filmography: User wants to know what series an actor has been in
+        - get_series_by_network: User wants series from a specific network
+        - get_upcoming_series: User wants to know about upcoming series
+        - get_series_episodes: User wants to know about episodes of a series
+        - get_next_aired: User wants to know when the next episode will air
+        - get_season_details: User wants information about a specific season
+        - get_character_details: User wants information about a character
+        - get_artwork: User wants to see images or artwork for a series
+        - get_series_awards: User wants to know what awards a TV series has won or been nominated for
+        - get_movie_awards: User wants to know what awards a movie has won or been nominated for
+        - advanced_search: User wants to search with multiple criteria or filters
+        - update_preferences: User is sharing their preferences
+        - help: User needs help using the system
+
         
         
         Keep your responses friendly, informative, and focused on the data provided.
@@ -92,6 +109,9 @@ class LLMService:
         - country: Country of origin
         - language: Language of interest
         - sort_by: How to sort results (popularity, name, firstAired, etc.)
+        - series_name: Name of the TV series
+        - movie_name: Name of the movie
+        - actor_name: Name
 
         Return a JSON object with the following structure:
         {

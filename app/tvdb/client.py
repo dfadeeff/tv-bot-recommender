@@ -371,3 +371,378 @@ class TVDBClient:
         response = self._make_request("GET", "/series/filter", params=filters)
         return response.get("data", [])
 
+    def advanced_search(
+            self,
+            query: Optional[str] = None,
+            type: Optional[str] = None,
+            year: Optional[int] = None,
+            country: Optional[str] = None,
+            company: Optional[str] = None,
+            language: Optional[str] = None,
+            director: Optional[str] = None,
+            primary_type: Optional[str] = None,
+            network: Optional[str] = None,
+            remote_id: Optional[str] = None,
+            offset: int = 0,
+            limit: int = 5
+    ) -> List[Dict]:
+        """Advanced search for TVDB content with multiple filter options.
+
+        Args:
+            query: The search query string (also accepts 'q' as alias)
+            type: Type of content to search (series, movie, person, company)
+            year: Filter by year (primarily for series/movies)
+            country: Filter by country code (3-letter code)
+            company: Filter by company name (production company, studio, etc.)
+            language: Filter by language code (3-letter code)
+            director: Filter by director name (primarily for movies)
+            primary_type: Filter by company type
+            network: Filter by TV network name
+            remote_id: Search by IMDB or EIDR ID
+            offset: Result offset for pagination
+            limit: Maximum number of results to return
+
+        Returns:
+            List of search results matching the criteria
+        """
+        # Build search parameters
+        params = {}
+
+        # Add query parameter (handles both 'query' and 'q')
+        if query:
+            params["query"] = query
+
+        # Add filter parameters if provided
+        if type:
+            params["type"] = type
+        if year:
+            params["year"] = year
+        if country:
+            params["country"] = country
+        if company:
+            params["company"] = company
+        if language:
+            params["language"] = language
+        if director:
+            params["director"] = director
+        if primary_type:
+            params["primaryType"] = primary_type
+        if network:
+            params["network"] = network
+        if remote_id:
+            params["remote_id"] = remote_id
+
+        # Add pagination parameters
+        params["offset"] = offset
+        params["limit"] = limit
+
+        # Make the request
+        print(f"Performing advanced search with parameters: {params}")
+        try:
+            response = self._make_request("GET", "/search", params=params)
+            results = response.get("data", [])
+            print(f"Found {len(results)} results")
+            return results
+        except TVDBError as e:
+            print(f"Search error: {e}")
+            return []
+
+    def search_movies(
+            self,
+            query: Optional[str] = None,
+            year: Optional[int] = None,
+            director: Optional[str] = None,
+            country: Optional[str] = None,
+            language: Optional[str] = None,
+            limit: int = 5
+    ) -> List[Dict]:
+        """Search for movies with specific filters.
+
+        Args:
+            query: Movie title or keywords
+            year: Release year
+            director: Director name
+            country: Country of origin (3-letter code)
+            language: Primary language (3-letter code)
+            limit: Maximum number of results
+
+        Returns:
+            List of movies matching the criteria
+        """
+        return self.advanced_search(
+            query=query,
+            type="movie",
+            year=year,
+            director=director,
+            country=country,
+            language=language,
+            limit=limit
+        )
+
+    def search_people(
+            self,
+            query: str,
+            limit: int = 5
+    ) -> List[Dict]:
+        """Search for people (actors, directors, etc.).
+
+        Args:
+            query: Person name
+            limit: Maximum number of results
+
+        Returns:
+            List of people matching the criteria
+        """
+        return self.advanced_search(
+            query=query,
+            type="person",
+            limit=limit
+        )
+
+    def search_companies(
+            self,
+            query: Optional[str] = None,
+            primary_type: Optional[str] = None,
+            country: Optional[str] = None,
+            limit: int = 5
+    ) -> List[Dict]:
+        """Search for companies.
+
+        Args:
+            query: Company name
+            primary_type: Type of company (e.g., "Production Company")
+            country: Country code (3-letter)
+            limit: Maximum number of results
+
+        Returns:
+            List of companies matching the criteria
+        """
+        return self.advanced_search(
+            query=query,
+            type="company",
+            primary_type=primary_type,
+            country=country,
+            limit=limit
+        )
+
+    def get_series_awards(self, series_id: int) -> List[Dict]:
+        """Get awards for a TV series.
+
+        Args:
+            series_id: The ID of the TV series
+
+        Returns:
+            List of awards for the series
+        """
+        try:
+            print(f"Fetching awards for series {series_id}")
+
+            # Method 1: Try to get awards from extended series info
+            extended_info = self.get_series_details(series_id)
+            awards = extended_info.get("awards", [])
+
+            if awards:
+                print(f"Found {len(awards)} awards in extended series info")
+                return awards
+
+            # Method 2: Try the direct series awards endpoint
+            print("No awards in extended info, trying direct awards endpoint")
+            endpoint = f"/series/{series_id}/awards"
+            response = self._make_request("GET", endpoint)
+            awards = response.get("data", [])
+
+            if awards:
+                print(f"Found {len(awards)} awards with direct endpoint")
+                return awards
+
+            # Method 3: Try searching all awards for this series
+            print("No awards found with direct endpoint, trying awards search")
+            all_awards = self._make_request("GET", "/awards").get("data", [])
+
+            # Look for awards related to this series
+            series_awards = []
+            for award in all_awards:
+                # Check categories for this series
+                categories = award.get("categories", [])
+                for category in categories:
+                    records = category.get("records", [])
+                    for record in records:
+                        if record.get("seriesId") == series_id:
+                            series_awards.append({
+                                "award_name": award.get("name"),
+                                "category": category.get("name"),
+                                "year": record.get("year"),
+                                "nominee": record.get("nominee"),
+                                "won": record.get("isWinner", False)
+                            })
+
+            print(f"Found {len(series_awards)} awards through search")
+            return series_awards
+
+        except TVDBError as e:
+            print(f"TVDB API Error getting awards: {e}")
+            return []
+        except Exception as e:
+            print(f"Unexpected error getting awards: {str(e)}")
+            return []
+
+    def get_movie_awards(self, movie_id: int) -> List[Dict]:
+        """Get awards for a movie.
+
+        Args:
+            movie_id: The ID of the movie
+
+        Returns:
+            List of awards for the movie
+        """
+        try:
+            print(f"Fetching awards for movie {movie_id}")
+
+            # Method 1: Try to get awards from extended movie info
+            extended_info = self._make_request("GET", f"/movies/{movie_id}/extended").get("data", {})
+            awards = extended_info.get("awards", [])
+
+            if awards:
+                print(f"Found {len(awards)} awards in extended movie info")
+                return awards
+
+            # Method 2: Try the direct movie awards endpoint
+            print("No awards in extended info, trying direct awards endpoint")
+            endpoint = f"/movies/{movie_id}/awards"
+            response = self._make_request("GET", endpoint)
+            awards = response.get("data", [])
+
+            if awards:
+                print(f"Found {len(awards)} awards with direct endpoint")
+                return awards
+
+            # Method 3: Try searching all awards for this movie
+            print("No awards found with direct endpoint, trying awards search")
+            all_awards = self._make_request("GET", "/awards").get("data", [])
+
+            # Look for awards related to this movie
+            movie_awards = []
+            for award in all_awards:
+                # Check categories for this movie
+                categories = award.get("categories", [])
+                for category in categories:
+                    records = category.get("records", [])
+                    for record in records:
+                        if record.get("movieId") == movie_id:
+                            movie_awards.append({
+                                "award_name": award.get("name"),
+                                "category": category.get("name"),
+                                "year": record.get("year"),
+                                "nominee": record.get("nominee"),
+                                "won": record.get("isWinner", False)
+                            })
+
+            print(f"Found {len(movie_awards)} awards through search")
+            return movie_awards
+
+        except TVDBError as e:
+            print(f"TVDB API Error getting movie awards: {e}")
+            return []
+        except Exception as e:
+            print(f"Unexpected error getting movie awards: {str(e)}")
+            return []
+
+    def get_people_awards(self, person_id: int) -> List[Dict]:
+        """Get awards for a person (actor, director, etc.).
+
+        Args:
+            person_id: The ID of the person
+
+        Returns:
+            List of awards for the person
+        """
+        try:
+            print(f"Fetching awards for person {person_id}")
+
+            # Method 1: Try the direct person awards endpoint
+            endpoint = f"/people/{person_id}/awards"
+            response = self._make_request("GET", endpoint)
+            awards = response.get("data", [])
+
+            if awards:
+                print(f"Found {len(awards)} awards with direct endpoint")
+                return awards
+
+            # Method 2: Try searching all awards for this person
+            print("No awards found with direct endpoint, trying awards search")
+            all_awards = self._make_request("GET", "/awards").get("data", [])
+
+            # Look for awards related to this person
+            person_awards = []
+            for award in all_awards:
+                # Check categories for this person
+                categories = award.get("categories", [])
+                for category in categories:
+                    records = category.get("records", [])
+                    for record in records:
+                        if record.get("personId") == person_id:
+                            person_awards.append({
+                                "award_name": award.get("name"),
+                                "category": category.get("name"),
+                                "year": record.get("year"),
+                                "nominee": record.get("nominee"),
+                                "won": record.get("isWinner", False)
+                            })
+
+            print(f"Found {len(person_awards)} awards through search")
+            return person_awards
+
+        except TVDBError as e:
+            print(f"TVDB API Error getting person awards: {e}")
+            return []
+        except Exception as e:
+            print(f"Unexpected error getting person awards: {str(e)}")
+            return []
+
+    def get_award_by_id(self, award_id: int) -> Dict:
+        """Get detailed information about an award by ID.
+
+        Args:
+            award_id: The ID of the award
+
+        Returns:
+            Award details
+        """
+        try:
+            response = self._make_request("GET", f"/awards/{award_id}")
+            return response.get("data", {})
+        except Exception as e:
+            print(f"Error getting award details: {e}")
+            return {}
+
+    def get_award_category(self, category_id: int) -> Dict:
+        """Get detailed information about an award category.
+
+        Args:
+            category_id: The ID of the award category
+
+        Returns:
+            Award category details
+        """
+        try:
+            response = self._make_request("GET", f"/awards/categories/{category_id}")
+            return response.get("data", {})
+        except Exception as e:
+            print(f"Error getting award category details: {e}")
+            return {}
+
+    def get_award_extended(self, award_id: int) -> Dict:
+        """Get extended information about an award by ID.
+
+        Args:
+            award_id: The ID of the award
+
+        Returns:
+            Extended award details including categories
+        """
+        try:
+            response = self._make_request("GET", f"/awards/{award_id}/extended")
+            return response.get("data", {})
+        except Exception as e:
+            print(f"Error getting extended award details: {e}")
+            return {}
