@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Series Recommender</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        .chat-container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .chat-header {
+            background-color: #3498db;
+            color: #fff;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .chat-messages {
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 70%;
+            white-space: pre-line;
+        }
+
+        .bot {
+            background-color: #e8f4fd;
+            color: #333;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+
+        .user {
+            background-color: #3498db;
+            color: #fff;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+            text-align: right;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-top: 1px solid #eee;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+
+        .chat-input button {
+            margin-left: 10px;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .chat-input button:hover {
+            background-color: #2980b9;
+        }
+
+        .loading {
+            text-align: center;
+            color: #888;
+            padding: 10px;
+        }
+
+        .examples {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .examples h3 {
+            margin-top: 0;
+            color: #3498db;
+        }
+
+        .example-query {
+            cursor: pointer;
+            padding: 8px 12px;
+            margin: 5px 0;
+            background-color: #f5f5f5;
+            border-radius: 15px;
+            display: inline-block;
+            transition: background-color 0.2s;
+        }
+
+        .example-query:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1>TV Series Recommender</h1>
+
+<div class="examples">
+    <h3>Example Questions</h3>
+    <div class="example-query" onclick="useExample(this)">What can you tell me about Breaking Bad?</div>
+    <div class="example-query" onclick="useExample(this)">I like sci-fi shows like Star Trek. What should I watch?</div>
+    <div class="example-query" onclick="useExample(this)">What are some popular shows on HBO?</div>
+</div>
+
+<div class="chat-container">
+    <div class="chat-header">
+        Chat with TV Series Recommender
+    </div>
+    <div class="chat-messages" id="chat-messages">
+        <div class="message bot">
+            Hi! I'm your TV series recommender assistant. Ask me about TV shows, and I'll help you discover new series
+            based on your preferences!
+        </div>
+    </div>
+    <div class="chat-input">
+        <input type="text" id="message-input" placeholder="Type your message here..." autocomplete="off">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    // Store the session ID
+    let sessionId = null;
+
+    // Function to send a message
+    async function sendMessage() {
+        const messageInput = document.getElementById('message-input');
+        const chatMessages = document.getElementById('chat-messages');
+        const message = messageInput.value.trim();
+
+        if (!message) return;
+
+        // Add user message to chat
+        chatMessages.innerHTML += `
+                <div class="message user">
+                    ${message}
+                </div>
+            `;
+
+        // Clear input
+        messageInput.value = '';
+
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Add loading indicator
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading';
+        loadingDiv.textContent = 'Thinking...';
+        chatMessages.appendChild(loadingDiv);
+
+        try {
+            // Call API
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: sessionId
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Error communicating with the server');
+            }
+
+            const data = await response.json();
+
+            // Store session ID
+            sessionId = data.session_id;
+
+            // Remove loading indicator
+            chatMessages.removeChild(loadingDiv);
+
+            // Add bot response to chat
+            chatMessages.innerHTML += `
+                    <div class="message bot">
+                        ${data.message}
+                    </div>
+                `;
+
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        } catch (error) {
+            console.error('Error:', error);
+
+            // Remove loading indicator
+            chatMessages.removeChild(loadingDiv);
+
+            // Add error message
+            chatMessages.innerHTML += `
+                    <div class="message bot">
+                        Sorry, there was an error processing your request. Please try again.
+                    </div>
+                `;
+
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    }
+
+    // Function to use an example query
+    function useExample(element) {
+        const messageInput = document.getElementById('message-input');
+        messageInput.value = element.textContent;
+        messageInput.focus();
+    }
+
+    // Listen for Enter key in the input field
+    document.getElementById('message-input').addEventListener('keyup', function (event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    });
+</script>
+</body>
+</html>
