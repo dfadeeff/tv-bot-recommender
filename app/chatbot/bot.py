@@ -86,7 +86,7 @@ class TVSeriesBot:
         params = query.parameters
 
         # Default limit for results
-        limit = 5
+        limit = 10
 
         if intent == "search_series":
             # Extract search parameters
@@ -225,6 +225,148 @@ class TVSeriesBot:
                 }
             }
 
+        # Updated portion of _handle_intent method for episode retrieval
+        elif intent == "get_series_episodes":
+            series_name = params.get("series_name", "")
+            season = params.get("season")
+
+            # Debug info
+            print(f"Getting episodes for '{series_name}', season {season}")
+
+            # Special case for Breaking Bad for debugging
+            if series_name.lower() == "breaking bad":
+                print("Detected Breaking Bad request - using special debug method")
+                self.tvdb_client.debug_breaking_bad_episodes()
+
+            # Ensure we have a series name
+            if not series_name:
+                return {"error": "Please specify a TV series name"}
+
+            # Convert season to integer if it's a string number
+            if season and isinstance(season, str) and season.isdigit():
+                season = int(season)
+
+            # Search for the series
+            results = self.tvdb_client.search_series(series_name, limit=1)
+
+            if not results:
+                return {"error": f"Could not find series '{series_name}'"}
+
+            # Get full information about the found series
+            found_series = results[0]
+            print(f"Found series: {found_series.get('name')} with ID {found_series.get('id')}")
+
+            # Get the details for the first result
+            series_id_str = found_series.get("id")
+            series_id = None
+
+            # Extract numeric ID from different possible formats
+            if isinstance(series_id_str, int):
+                series_id = series_id_str
+            elif isinstance(series_id_str, str):
+                if series_id_str.startswith("series-"):
+                    try:
+                        series_id = int(series_id_str.replace("series-", ""))
+                    except ValueError:
+                        return {"error": f"Invalid series ID format: {series_id_str}"}
+                else:
+                    try:
+                        series_id = int(series_id_str)
+                    except ValueError:
+                        return {"error": f"Invalid series ID format: {series_id_str}"}
+            else:
+                return {"error": f"Could not find valid ID for series '{series_name}'"}
+
+            # Get episodes for the specified season
+            print(f"Getting episodes for series ID {series_id}, season {season}")
+            episodes = self.tvdb_client.get_series_episodes_by_season(series_id, season_number=season)
+
+            # Add series name to the response for context
+            return {
+                "series_name": found_series.get("name", series_name),
+                "season_number": season,
+                "episodes": episodes
+            }
+
+        elif intent == "get_next_aired":
+            series_name = params.get("series_name", "")
+
+            # Search for the series
+            results = self.tvdb_client.search_series(series_name, limit=1)
+
+            if not results:
+                return {"error": f"Could not find series '{series_name}'"}
+
+            # Get the series ID
+            series_id_str = results[0].get("id")
+
+            # Extract numeric ID
+            if series_id_str and isinstance(series_id_str, str) and series_id_str.startswith("series-"):
+                try:
+                    series_id = int(series_id_str.replace("series-", ""))
+                    return self.tvdb_client.get_series_next_aired(series_id)
+                except ValueError:
+                    return {"error": f"Invalid series ID format: {series_id_str}"}
+            else:
+                return {"error": f"Could not find valid ID for series '{series_name}'"}
+
+        elif intent == "get_artwork":
+            series_name = params.get("series_name", "")
+
+            # Search for the series
+            results = self.tvdb_client.search_series(series_name, limit=1)
+
+            if not results:
+                return {"error": f"Could not find series '{series_name}'"}
+
+            # Get the series ID
+            series_id_str = results[0].get("id")
+
+            # Extract numeric ID
+            if series_id_str and isinstance(series_id_str, str) and series_id_str.startswith("series-"):
+                try:
+                    series_id = int(series_id_str.replace("series-", ""))
+                    return self.tvdb_client.get_series_artworks(series_id)
+                except ValueError:
+                    return {"error": f"Invalid series ID format: {series_id_str}"}
+            else:
+                return {"error": f"Could not find valid ID for series '{series_name}'"}
+
+        elif intent == "get_character_details":
+            character_name = params.get("character_name", "")
+            series_name = params.get("series_name", "")
+
+            if not character_name:
+                return {"error": "Please specify a character name"}
+
+            # If series name is provided, use it to narrow down the search
+            if series_name:
+                # Search for the series
+                series_results = self.tvdb_client.search_series(series_name, limit=1)
+
+                if not series_results:
+                    return {"error": f"Could not find series '{series_name}'"}
+
+                # Get the series ID
+                series_id_str = series_results[0].get("id")
+
+                # Extract numeric ID
+                if series_id_str and isinstance(series_id_str, str) and series_id_str.startswith("series-"):
+                    try:
+                        series_id = int(series_id_str.replace("series-", ""))
+                        # Get the series details including characters
+                        series_details = self.tvdb_client.get_series_details(series_id)
+
+                        # Find the character in the series
+                        characters = series_details.get("characters", [])
+                        for character in characters:
+                            if character_name.lower() in character.get("name", "").lower():
+                                return character
+
+                        return {"error": f"Could not find character '{character_name}' in series '{series_name}'"}
+                    except ValueError:
+                        return {"error": f"Invalid series ID format: {series_id_str}"}
+
         else:
             # Unknown intent, return help information
             return {
@@ -235,7 +377,8 @@ class TVSeriesBot:
                         "Getting information about specific TV series",
                         "Finding similar shows to ones you like",
                         "Discovering what shows an actor has been in",
-                        "Learning about upcoming series"
+                        "Learning about upcoming series",
+                        "Suggestion what to show next",
                     ]
                 }
             }

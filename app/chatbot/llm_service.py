@@ -15,7 +15,6 @@ load_dotenv()
 # Get OpenAI API key from environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-#OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -57,16 +56,42 @@ class LLMService:
         - get_actor_filmography: User wants to know what series an actor has been in
         - get_series_by_network: User wants series from a specific network
         - get_upcoming_series: User wants to know about upcoming series
+        - get_series_episodes: User wants to know about episodes of a series
+        - get_next_aired: User wants to know when the next episode will air
+        - get_season_details: User wants information about a specific season
+        - get_character_details: User wants information about a character
+        - get_artwork: User wants to see images or artwork for a series
         - update_preferences: User is sharing their preferences
         - help: User needs help using the system
+        
+        
+        Keep your responses friendly, informative, and focused on the data provided.
+        - Highlight key information like genres, cast, ratings, and air dates.
+        - If recommending multiple series, explain briefly why each one matches their interests.
+        - If the search returned no results, acknowledge this and suggest alternatives or better search terms.
+        - Keep responses concise but informative, focusing on the most relevant details.
+        
+        For episode queries:
+        - When listing episodes, format them clearly with episode numbers, titles, and brief descriptions.
+        - For season-specific queries, mention the season number in your response.
+        - If there are many episodes, summarize the first few and the total count instead of listing them all.
+        - Highlight notable episodes if that information is available.
+        
+        Always base your responses solely on the provided TVDB data. Do not make up information about TV series.
 
         Parameters to extract (when applicable):
         - series_name: Name of the TV series
         - actor_name: Name of the actor
+        - character_name: Name of the character
         - genre: Genre of interest
         - network: TV network
+        - season: Season number
+        - episode: Episode number
         - year: Year of release
         - status: Status of the series (upcoming, ongoing, ended)
+        - country: Country of origin
+        - language: Language of interest
+        - sort_by: How to sort results (popularity, name, firstAired, etc.)
 
         Return a JSON object with the following structure:
         {
@@ -259,6 +284,8 @@ class LLMService:
             print(f"Error calling OpenAI API: {str(e)}")
             return "I'm having trouble generating a response right now. Please try again later."
 
+    # Add this to your LLMService class
+
     def _format_search_results(self, results: Any, intent: str) -> Dict:
         """Format search results for the LLM in a consistent structure.
 
@@ -269,6 +296,56 @@ class LLMService:
         Returns:
             Formatted search results
         """
+        # Special handling for episode results
+        if intent == "get_series_episodes" and isinstance(results, dict):
+            # Format episode data for clearer presentation
+            formatted_results = {
+                "series_name": results.get("series_name", "Unknown Series"),
+                "season_number": results.get("season_number", "All Seasons"),
+                "episodes_count": len(results.get("episodes", [])),
+                "episodes": []
+            }
+
+            # Print debug info
+            print(f"Formatting {formatted_results['episodes_count']} episodes for {formatted_results['series_name']}")
+
+            # Sort episodes by number if available
+            episodes = sorted(
+                results.get("episodes", []),
+                key=lambda x: (
+                    x.get("number", x.get("episodeNumber", x.get("seasonNumber", 999))),
+                    x.get("name", "")
+                )
+            )
+
+            # Format each episode with consistent fields
+            for episode in episodes:
+                # Try various possible field names
+                ep_num = episode.get("number", episode.get("episodeNumber", "?"))
+                title = episode.get("name", "Untitled")
+                overview = episode.get("overview", "")
+                air_date = episode.get("aired", episode.get("firstAired", "Unknown"))
+
+                formatted_episode = {
+                    "episode_number": ep_num,
+                    "title": title,
+                    "overview": overview if overview else "No description available",
+                    "aired": air_date
+                }
+                formatted_results["episodes"].append(formatted_episode)
+
+            if not formatted_results["episodes"]:
+                # Add error message if no episodes found
+                formatted_results[
+                    "error"] = f"No episodes found for season {formatted_results['season_number']} of {formatted_results['series_name']}"
+                formatted_results["suggestions"] = [
+                    "Try a different season number",
+                    "Check if the season exists for this series",
+                    "Try searching for the series with a more specific name"
+                ]
+
+            return formatted_results
+
         # If results is already a dictionary or list, return it directly
         if isinstance(results, (dict, list)):
             return results
