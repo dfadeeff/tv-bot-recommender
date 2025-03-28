@@ -233,11 +233,6 @@ class TVSeriesBot:
             # Debug info
             print(f"Getting episodes for '{series_name}', season {season}")
 
-            # Special case for Breaking Bad for debugging
-            if series_name.lower() == "breaking bad":
-                print("Detected Breaking Bad request - using special debug method")
-                self.tvdb_client.debug_breaking_bad_episodes()
-
             # Ensure we have a series name
             if not series_name:
                 return {"error": "Please specify a TV series name"}
