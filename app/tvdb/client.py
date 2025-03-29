@@ -3,6 +3,7 @@
 import os
 import time
 from typing import Dict, List, Optional, Any
+from app.tvdb.models import Episode, Series, SearchResult, SeriesBase
 
 import requests
 from dotenv import load_dotenv
@@ -124,20 +125,7 @@ class TVDBClient:
             status: Optional[str] = None,
             genre: Optional[str] = None
     ) -> List[Dict]:
-        """Search for TV series by name.
-
-        Args:
-            query: Search term
-            limit: Maximum number of results
-            year: Filter by year
-            country: Filter by country of origin
-            network: Filter by network
-            status: Filter by series status (e.g., "Continuing", "Ended")
-            genre: Filter by genre
-
-        Returns:
-            List of TV series matching the search criteria
-        """
+        """Search for TV series by name."""
         # Use the general search endpoint with type=series
         params = {
             "q": query,
@@ -145,28 +133,63 @@ class TVDBClient:
         }
 
         response = self._make_request("GET", "/search", params=params)
-
-        # Filter and limit results
         results = response.get("data", [])
+
+        # Print raw response data for debugging
+        print(f"Raw search results for '{query}': {len(results)} items")
+
+        # Validate and transform results using your SeriesBase model
+        validated_results = []
+        for result in results:
+            try:
+                # Pre-process any known problematic fields
+                if "status" in result and isinstance(result["status"], str):
+                    # Create a proper Status object
+                    result["status"] = {"id": 0, "name": result["status"]}
+
+                # Handle ID format conversion if needed
+                if "id" in result and isinstance(result["id"], str) and result["id"].startswith("series-"):
+                    try:
+                        result["id"] = int(result["id"].replace("series-", ""))
+                    except ValueError:
+                        pass
+
+                # Add minimum required fields if missing
+                if "slug" not in result:
+                    result["slug"] = result.get("name", "").lower().replace(" ", "-")
+
+                # Validate with model, but use exclude_unset to handle missing fields
+                series = SeriesBase.parse_obj(result)
+                validated_results.append(series.dict(exclude_unset=True))
+            except Exception as e:
+                print(f"Error validating series data for item {result.get('name', 'unknown')}: {e}")
+                # Add the original data as fallback
+                validated_results.append(result)
 
         # Apply additional filtering if needed
         if year or country or network or status or genre:
             filtered_results = []
-            for series in results:
+            for series in validated_results:
                 if year and series.get("year") != year:
                     continue
                 if country and country.lower() not in series.get("country", "").lower():
                     continue
                 if network and series.get("network") and network.lower() not in series.get("network").lower():
                     continue
-                if status and series.get("status") and status.lower() not in series.get("status").lower():
-                    continue
+                if status and series.get("status"):
+                    # Handle status which may now be an object
+                    if isinstance(series.get("status"), dict):
+                        if status.lower() not in series["status"].get("name", "").lower():
+                            continue
+                    elif isinstance(series.get("status"), str):
+                        if status.lower() not in series["status"].lower():
+                            continue
                 # Genre would need series details to filter, we'll skip here for simplicity
                 filtered_results.append(series)
-            results = filtered_results
+            validated_results = filtered_results
 
         # Return limited results
-        return results[:limit]
+        return validated_results[:limit]
 
     def get_series_details(self, series_id: int) -> Dict:
         """Get detailed information about a TV series.
@@ -233,70 +256,69 @@ class TVDBClient:
     # Add these methods to your TVDBClient class in app/tvdb/client.py
 
     def get_series_episodes_by_season(self, series_id: int, season_number: Optional[int] = None) -> List[Dict]:
-        """Get episodes of a TV series by season number.
-
-        Args:
-            series_id: The ID of the TV series
-            season_number: Optional season number to filter by
-
-        Returns:
-            List of episodes matching the criteria
-        """
+        """Get episodes of a TV series by season number."""
         try:
-            # According to API docs, the correct endpoint is /series/{id}/episodes/{season-type}
-            # Valid season types from API docs typically include "default" or "official"
+            # Existing code to fetch episodes
             season_type = "default"
-
-            # First, get all episodes using the proper endpoint format
             endpoint = f"/series/{series_id}/episodes/{season_type}"
             print(f"Fetching episodes from endpoint: {endpoint}")
 
             response = self._make_request("GET", endpoint)
-            all_episodes = response.get("data", [])
+            all_episodes_data = response.get("data", [])
 
-            if not all_episodes:
+            if not all_episodes_data:
                 print(f"No episodes found for series {series_id}")
                 return []
 
-            print(f"Found {len(all_episodes)} total episodes for series {series_id}")
+            print(f"Found {len(all_episodes_data)} total episodes for series {series_id}")
 
-            # If season number is specified, filter the results
+            # Convert raw dictionaries to Episode models
+            validated_episodes = []
+            for episode_data in all_episodes_data:
+                try:
+                    # Add series_id if it's missing in the API response
+                    if "series_id" not in episode_data and "seriesId" not in episode_data:
+                        episode_data["seriesId"] = series_id
+
+                    # Ensure episode has a name (required by your model)
+                    if "name" not in episode_data or not episode_data["name"]:
+                        episode_data["name"] = "Untitled Episode"
+
+                    # Create Episode model and validate the data with better error handling
+                    episode = Episode.parse_obj(episode_data)
+                    validated_episodes.append(episode.dict())
+                except Exception as e:
+                    print(f"Error validating episode: {e}")
+                    # For episodes, add a minimally processed version instead of skipping
+                    # This ensures we return something even if validation fails
+                    basic_episode = {
+                        "id": episode_data.get("id", 0),
+                        "seriesId": series_id,
+                        "name": episode_data.get("name", "Untitled"),
+                        "number": episode_data.get("number", episode_data.get("episodeNumber")),
+                        "seasonNumber": episode_data.get("seasonNumber", episode_data.get("season")),
+                        "overview": episode_data.get("overview", ""),
+                        "aired": episode_data.get("aired", episode_data.get("firstAired"))
+                    }
+                    validated_episodes.append(basic_episode)
+
+            # Filter by season if needed
             if season_number is not None:
                 filtered_episodes = []
-                for episode in all_episodes:
-                    # Check all possible season number field names
-                    season_num = episode.get("seasonNumber")
-                    if season_num is None:
-                        season_num = episode.get("season")
-
-                    # Handle both integer and string comparisons
-                    if season_num == season_number or str(season_num) == str(season_number):
+                for episode in validated_episodes:
+                    # Check season number with different possible field names
+                    ep_season = episode.get("season_number", episode.get("seasonNumber"))
+                    if ep_season == season_number or str(ep_season) == str(season_number):
                         filtered_episodes.append(episode)
 
                 print(f"Filtered to {len(filtered_episodes)} episodes for season {season_number}")
                 return filtered_episodes
 
-            # Return all episodes if no season is specified
-            return all_episodes
+            # Return all episodes
+            return validated_episodes
 
-        except TVDBError as e:
-            print(f"TVDB API Error: {e}")
-            # Try fallback with /episodes/filter endpoint
-            try:
-                print(f"Trying fallback method with /episodes/filter")
-                params = {"seriesId": series_id}
-                if season_number is not None:
-                    params["seasonNumber"] = season_number
-
-                response = self._make_request("GET", "/episodes/filter", params=params)
-                episodes = response.get("data", [])
-                print(f"Fallback found {len(episodes)} episodes")
-                return episodes
-            except Exception as fallback_error:
-                print(f"Fallback also failed: {fallback_error}")
-                return []
         except Exception as e:
-            print(f"Unexpected error getting episodes: {str(e)}")
+            print(f"Error in get_series_episodes_by_season: {e}")
             return []
 
     def get_series_next_aired(self, series_id: int) -> Dict:

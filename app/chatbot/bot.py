@@ -229,9 +229,24 @@ class TVSeriesBot:
         elif intent == "get_series_episodes":
             series_name = params.get("series_name", "")
             season = params.get("season")
+            episode = params.get("episode")
+            # Add debug logging
+            print(f"Processing episode request: series='{series_name}', season={season}, episode={episode}")
 
-            # Debug info
-            print(f"Getting episodes for '{series_name}', season {season}")
+            # If query looks like "Series name episode X", parse it
+            if not series_name and query.query_text:
+                # Extract series name and episode from query text
+                query_parts = query.query_text.lower().split("episode")
+                if len(query_parts) == 2:
+                    series_name = query_parts[0].strip()
+                    try:
+                        episode_num = int(query_parts[1].strip())
+                        # Typically episode numbers are used with a season number
+                        # Default to season 1 if not specified
+                        if not season:
+                            season = 1
+                    except ValueError:
+                        pass
 
             # Ensure we have a series name
             if not series_name:

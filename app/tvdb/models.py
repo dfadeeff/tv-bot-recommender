@@ -2,7 +2,7 @@
 
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class Translation(BaseModel):
@@ -170,7 +170,8 @@ class SeriesBase(BaseModel):
     slug: str
     aliases: Optional[List[str]] = None
     image: Optional[str] = None
-    status: Optional[Status] = None
+    # Allow status to be either a string or a Status object
+    status: Optional[Union[str, Status]] = None
     original_network: Optional[Network] = Field(None, alias="originalNetwork")
     overview: Optional[str] = None
     first_aired: Optional[str] = Field(None, alias="firstAired")
@@ -182,6 +183,14 @@ class SeriesBase(BaseModel):
     class Config:
         """Pydantic config."""
         populate_by_name = True
+
+    # Add a validator to handle string status values
+    @validator('status', pre=True)
+    def validate_status(cls, v):
+        if isinstance(v, str):
+            # Create a simple Status object from string
+            return {"id": 0, "name": v}
+        return v
 
 
 class Series(SeriesBase):

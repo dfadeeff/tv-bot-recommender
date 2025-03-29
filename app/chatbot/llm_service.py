@@ -316,6 +316,11 @@ class LLMService:
         Returns:
             Formatted search results
         """
+        # Handle unexpected string results
+        if isinstance(results, str):
+            print(f"Warning: Received string instead of object: {results}")
+            return {"error": "Unexpected string response", "message": results}
+
         # Special handling for episode results
         if intent == "get_series_episodes" and isinstance(results, dict):
             # Format episode data for clearer presentation
