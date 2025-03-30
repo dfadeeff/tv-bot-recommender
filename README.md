@@ -77,7 +77,21 @@ The application is structured into the following components:
 - **Conversation Memory**: Maintains conversation context for better user experience
 - **Chatbot**: Orchestrates all components to provide a seamless experience
 
-## API Endpoints
+## Core Components
+- **TV Series Bot**: The main orchestrator that processes user queries, handles conversation context, and executes the appropriate API calls based on user intent.
+- **LLM Service**: Leverages OpenAI's language models to a) Parse natural language queries into structured intents and parameters and b) Generate human-like responses based on the data fetched from the TVDB API
+- **Conversation Memory**: Stores and manages conversation history, user preferences (favorite genres, actors, networks) and recently viewed series for context in follow-up questions
+- **TVDB Client**: A comprehensive client for the TVDB API that supports 
+  - Series searching with multiple filters (name, genre, network, etc.)
+  - Detailed series information retrieval
+  - Episode and season data retrieval
+  - Cast and character information
+  - Similar series recommendations
+  - Award information lookup
+  - Advanced search capabilities
+
+
+## Key API Endpoints
 
 - `GET /`: Web interface for the chatbot
 - `POST /api/chat`: Send a message to the chatbot
