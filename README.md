@@ -22,7 +22,7 @@ A chatbot that helps users discover TV series based on their preferences using t
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/tv-series-recommender.git
+git clone https://github.com/dfadeeff/tv-bot-recommender
 cd tv-series-recommender
 ```
 
