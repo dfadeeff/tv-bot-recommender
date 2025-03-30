@@ -2,6 +2,7 @@
 import sys
 import os
 from pathlib import Path
+from app.config import settings, log_environment_info
 
 # Add the project root to the Python path
 root = Path(__file__).parent.parent
@@ -17,7 +18,7 @@ try:
     os.environ["VERCEL"] = "1"
 
     # First, check if we can import the config
-    from app.tvdb.config import settings, log_environment_info
+
 
     # Log environment info for debugging
     log_environment_info()
