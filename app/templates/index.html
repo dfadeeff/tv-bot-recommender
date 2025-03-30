@@ -46,6 +46,17 @@
             border-radius: 18px;
             max-width: 70%;
             white-space: pre-line;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .message a {
+            word-break: break-all; /* This will break long URLs */
+        }
+
+        .message img {
+            max-width: 100%;
+            height: auto;
         }
 
         .bot {
@@ -132,9 +143,13 @@
 
 <div class="examples">
     <h3>Example Questions</h3>
-    <div class="example-query" onclick="useExample(this)">What can you tell me about Breaking Bad?</div>
+    <div class="example-query" onclick="useExample(this)">I like drama shows with strong characters. Any
+        recommendations, maybe similar to Game of Thrones?
+    </div>
     <div class="example-query" onclick="useExample(this)">I like sci-fi shows like Star Trek. What should I watch?</div>
-    <div class="example-query" onclick="useExample(this)">What are some popular shows on HBO?</div>
+    <div class="example-query" onclick="useExample(this)">What are some good science fiction series from the last
+        decade?
+    </div>
 </div>
 
 <div class="chat-container">

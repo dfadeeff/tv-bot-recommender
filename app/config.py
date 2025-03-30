@@ -3,9 +3,14 @@
 import os
 from dotenv import load_dotenv
 from pydantic import BaseSettings, Field
+import sys
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file - only in development
+if os.getenv("VERCEL") != "1":
+    load_dotenv()
+    print("Loaded environment variables from .env file")
+else:
+    print("Running in Vercel environment, skipping .env loading")
 
 
 class Settings(BaseSettings):
@@ -13,11 +18,12 @@ class Settings(BaseSettings):
 
     # API Configuration
     tvdb_api_url: str = Field(default="https://api4.thetvdb.com/v4", env="TVDB_API_URL")
-    tvdb_api_key: str = Field(..., env="TVDB_API_KEY")
+    # Make these optional with default=None, then check them at runtime
+    tvdb_api_key: str = Field(default=None, env="TVDB_API_KEY")
     tvdb_pin: str = Field(default=None, env="TVDB_PIN")
 
     # OpenAI Configuration
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    openai_api_key: str = Field(default=None, env="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-3.5-turbo", env="OPENAI_MODEL")
 
     # Application Configuration
@@ -44,17 +50,34 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
+# Print environment variables for debugging
+def log_environment_info():
+    """Log environment information for debugging."""
+    print(f"PYTHONPATH: {os.environ.get('PYTHONPATH')}")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Directory contents: {os.listdir('.')}")
+    print(f"TVDB_API_KEY set: {'Yes' if os.environ.get('TVDB_API_KEY') else 'No'}")
+    print(f"OPENAI_API_KEY set: {'Yes' if os.environ.get('OPENAI_API_KEY') else 'No'}")
+    print(f"Available environment variables: {list(os.environ.keys())}")
+
+
+# Don't validate at import time, do it when actually needed
 def validate_config():
     """Validate that all required configuration variables are set."""
-    required_vars = [
-        ("TVDB_API_KEY", settings.tvdb_api_key),
-        ("OPENAI_API_KEY", settings.openai_api_key),
-    ]
+    missing_vars = []
 
-    missing_vars = [var_name for var_name, var_value in required_vars if not var_value]
+    # Check TVDB API key
+    if not settings.tvdb_api_key:
+        missing_vars.append("TVDB_API_KEY")
+
+    # Check OpenAI API key
+    if not settings.openai_api_key:
+        missing_vars.append("OPENAI_API_KEY")
 
     if missing_vars:
-        raise ValueError(
-            f"Missing required environment variables: {', '.join(missing_vars)}. "
-            "Please check your .env file."
-        )
+        error_message = f"Missing required environment variables: {', '.join(missing_vars)}."
+        print(f"ERROR: {error_message}", file=sys.stderr)
+        # Don't raise an exception, just return False
+        return False, error_message
+
+    return True, "Configuration is valid"

@@ -12,10 +12,12 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
+
         h1 {
             color: #2c3e50;
             text-align: center;
         }
+
         .container {
             background-color: #fff;
             border-radius: 8px;
@@ -23,6 +25,7 @@
             padding: 20px;
             margin-top: 20px;
         }
+
         .btn {
             display: inline-block;
             padding: 10px 20px;
@@ -34,17 +37,34 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
+
         .btn:hover {
             background-color: #2980b9;
         }
     </style>
-    {% block styles %}{% endblock %}
+    {% block styles %}
+    <style>
+        .message {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .message a {
+            word-break: break-all;
+        }
+
+        .message img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+    {% endblock %}
 </head>
 <body>
-    <h1>{% block header %}TV Series Recommender{% endblock %}</h1>
-    <div class="container">
-        {% block content %}{% endblock %}
-    </div>
-    {% block scripts %}{% endblock %}
+<h1>{% block header %}TV Series Recommender{% endblock %}</h1>
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
+{% block scripts %}{% endblock %}
 </body>
 </html>
