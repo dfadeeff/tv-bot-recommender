@@ -6,6 +6,7 @@ from app.tvdb.client import TVDBClient
 from app.chatbot.llm_service import LLMService
 from app.chatbot.memory import ConversationMemory
 from app.tvdb.models import UserQuery
+from app.controllers.movie_controller import MovieController
 
 
 class TVSeriesBot:
@@ -16,6 +17,7 @@ class TVSeriesBot:
         self.tvdb_client = TVDBClient()
         self.llm_service = LLMService()
         self.memory = ConversationMemory()
+        self.movie_controller = MovieController(self.tvdb_client, self.llm_service)
 
     def process_query(self, query_text: str, session_id: Optional[str] = None) -> Tuple[str, str]:
         """Process a user query and generate a response.
@@ -86,7 +88,18 @@ class TVSeriesBot:
         params = query.parameters
 
         # Default limit for results
-        limit = 10
+        limit = 20
+
+        # Check if this is a movie-related intent
+        movie_intents = [
+            "search_movies", "get_movie_details", "get_similar_movies",
+            "get_movie_by_director", "get_movie_awards", "get_trending_movies",
+            "recommend_movies"
+        ]
+
+        if intent in movie_intents:
+            # Route to movie controller
+            return self.movie_controller.handle_request(query, self.memory.get_context("default_session"))
 
         if intent == "search_series":
             # Extract search parameters
